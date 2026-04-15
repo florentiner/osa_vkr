@@ -61,6 +61,17 @@ def get_file_content(repo_url: str, path: str, token: Optional[str]) -> str:
         raise ValueError(f"Could not fetch file {path}: {e}") from e
 
 
+def get_commit_count(repo_url: str, token: Optional[str], threshold: int = 5) -> int:
+    """Return commit count, stopping iteration once threshold+1 is reached."""
+    repo = _get_repo(repo_url, token)
+    count = 0
+    for _ in repo.get_commits():
+        count += 1
+        if count > threshold:
+            break
+    return count
+
+
 def clone_repo(repo_url: str, token: Optional[str], target_dir: str) -> None:
     """Shallow-clone repo into target_dir (depth=1)."""
     if token and "github.com" in repo_url:

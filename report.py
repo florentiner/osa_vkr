@@ -66,6 +66,10 @@ def _check_line(key: str, val: dict) -> str:
             return "readme: yes (empty)"
         return "readme: yes"
 
+    if key == "commits":
+        label = "yes (>5)" if val.get("present") else f"no ({val.get('count', 0)})"
+        return f"commits: {label}"
+
     if key == "syntax":
         return f"syntax: {val.get('summary', 'unknown')}"
 
@@ -83,6 +87,7 @@ def build_text_report(report: dict) -> str:
     order = [
         "readme",
         "license",
+        "commits",
         "requirements",
         "execution_files",
         "repo_type",

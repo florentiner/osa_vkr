@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from llm_client import call_llm
 from config import Config
-from github_client import get_file_content, clone_repo
+from github_client import get_file_content, clone_repo, get_commit_count
 
 # ── Regex patterns (matched against basename only) ────────────────────────────
 
@@ -162,6 +162,11 @@ def check_experiment_scripts(flat_paths: list, config: Config) -> dict:
     return {"applicable": True, "present": len(verified) > 0, "files": verified}
 
 
+def check_commits(config: Config) -> dict:
+    count = get_commit_count(config.repo_url, config.github_token, threshold=5)
+    return {"present": count > 5, "count": count}
+
+
 def check_syntax(flat_paths: list, clone_dir: str) -> dict:
     """Run python -m compileall on all .py files in the cloned repo."""
     import subprocess
@@ -235,9 +240,10 @@ def check_docstrings(flat_paths: list, clone_dir: str) -> dict:
 def run_all_checks(flat_paths: list, all_paths: list, config: Config) -> dict:
     results = {}
 
-    # Always: readme (fetches content), license
+    # Always: readme (fetches content), license, commits
     results["readme"] = check_readme(flat_paths, config)
     results["license"] = check_license(flat_paths)
+    results["commits"] = check_commits(config)
 
     # Execution files + repo type (repo_type gates requirements)
     results["execution_files"] = check_execution_files(flat_paths, config)
