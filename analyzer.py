@@ -3,6 +3,7 @@ import argparse
 import json
 import sys
 
+import llm_client
 from config import load_config
 from github_client import get_tree
 from checks import run_all_checks
@@ -46,6 +47,11 @@ def main():
         sys.exit(1)
 
     print(f"Tree: {len(flat_paths)} files, {len(all_paths) - len(flat_paths)} directories", file=sys.stderr)
+
+    # Enable LLM request logging for this run
+    import os as _os
+    llm_client._log_dir = _os.path.join(_os.path.dirname(__file__), "requests")
+    llm_client._log_counter = 0
 
     # Run all checks
     print("Running checks...", file=sys.stderr)

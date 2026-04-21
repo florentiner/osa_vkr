@@ -85,22 +85,48 @@ def check_execution_files(flat_paths: list, config: Config) -> dict:
     return {"present": len(verified) > 0, "llm_suggested": suggested, "verified": verified}
 
 
-def _sample_tree(all_paths: list, max_per_dir: int = 5, max_total: int = 500) -> list:
+def _cap_files_per_dir(paths: list, max_per_dir: int = 50) -> list:
+    """Return paths with at most max_per_dir entries per directory."""
+    dir_counts = defaultdict(int)
+    result = []
+    for path in paths:
+        parts = path.replace("\\", "/").split("/")
+        parent = "/".join(parts[:-1]) if len(parts) > 1 else ""
+        if dir_counts[parent] < max_per_dir:
+            result.append(path)
+            dir_counts[parent] += 1
+    return result
+
+
+def _sample_tree(all_paths: list, file_set: set = None,
+                 max_per_dir: int = 50, max_total: int = 500) -> list:
+    """Sample all_paths for LLM context.
+
+    Directories (paths not in file_set) are always included.
+    Files count toward the max_per_dir cap per parent directory.
+    file_set: set of file-only paths (blobs); if None, all paths are treated as files.
+    """
     dir_counts = defaultdict(int)
     sampled = []
     for path in all_paths:
         parts = path.replace("\\", "/").split("/")
         parent = "/".join(parts[:-1]) if len(parts) > 1 else ""
-        if dir_counts[parent] < max_per_dir:
+        is_file = file_set is None or path in file_set
+        if is_file:
+            if dir_counts[parent] < max_per_dir:
+                sampled.append(path)
+                dir_counts[parent] += 1
+        else:
+            # directory entry — always include, doesn't count toward cap
             sampled.append(path)
-            dir_counts[parent] += 1
         if len(sampled) >= max_total:
             break
     return sampled
 
 
-def check_repo_type(all_paths: list, config: Config) -> dict:
-    capped = _sample_tree(all_paths)
+def check_repo_type(all_paths: list, config: Config, flat_paths: list = None) -> dict:
+    file_set = set(flat_paths) if flat_paths is not None else None
+    capped = _sample_tree(all_paths, file_set=file_set)
     file_list = "\n".join(capped)
     prompt = _load_prompt("repo_type.txt").replace("{file_list}", file_list)
     result = call_llm(prompt, config.openrouter_key, config.model)
@@ -146,6 +172,7 @@ def check_data_files(flat_paths: list, config: Config) -> dict:
 
     path_set = _path_set(flat_paths)
     verified = [p for p in result.get("data_files", []) if p in path_set]
+    verified = _cap_files_per_dir(verified, max_per_dir=50)
     return {"applicable": True, "present": len(verified) > 0, "files": verified}
 
 
@@ -247,7 +274,7 @@ def run_all_checks(flat_paths: list, all_paths: list, config: Config) -> dict:
 
     # Execution files + repo type (repo_type gates requirements)
     results["execution_files"] = check_execution_files(flat_paths, config)
-    repo_type_result = check_repo_type(all_paths, config)
+    repo_type_result = check_repo_type(all_paths, config, flat_paths=flat_paths)
     results["repo_type"] = repo_type_result
     repo_type = repo_type_result.get("value", "algorithm_experiments")
 
