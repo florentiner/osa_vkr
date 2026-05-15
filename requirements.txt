@@ -1,2 +1,5 @@
 requests>=2.31.0
 PyGithub>=2.1.1
+pymupdf>=1.24.0
+streamlit>=1.35.0
+markdown-it-py>=3.0.0
